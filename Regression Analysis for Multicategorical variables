@@ -1,0 +1,65 @@
+dec10=read.csv(file="Dec10th_model.csv", header=T)
+
+
+
+######exploratory analysis
+str(dec10)
+table(totalimpressions)
+table(creative_name)
+table(exchange_name)
+table(os)
+table(dma) 
+table(click)
+table(fold_position)
+table(day_of_week)
+table(strategy_id)
+mean(CTR)
+mean(CPC)
+table(strategy_id)
+mean(as.numeric(totalspend))
+
+dec10.clean=cbind(as.numeric(strategy_id), as.numeric(totalimpressions),as.numeric(totalspend) ,as.numeric(fold_position),as.numeric(avgcpm),as.numeric(CTR),as.numeric(CPC),as.numeric(avgbidprice))
+cor(dec10.clean)
+
+####### principal component analysis to test colinearity
+install.packages("psych")
+library(psych)
+
+describe(dec10.mod)
+headTail(dec10.mod)
+Factor.analysis.variables=cbind(strategy_id,creative_name,exchange_name,os,fold_position,day_of_week,clicks,totalimpressions,totalspend,  avgcpm,CTR,CPC,avgbidprice)
+FA=prcomp(Factor.analysis.variables,center=T,scale=T)
+
+
+######create a random sample in order due to file size being too large
+set.seed(234)
+data.mod <- sample(seq_len(nrow(dec10)), size = 10000)
+dec10.mod=dec10[data.mod,]
+
+#####model1 all data no modifications (CTR)
+model1=lm(data=dec10.mod, CTR~strategy_id+creative_name+exchange_name+os+fold_position+day_of_week+clicks+totalimpressions+totalspend+  avgcpm+CPC+avgbidprice, na.action = na.exclude)
+summary(model1)
+anova(model1)
+##adjusted R^2=.742
+
+#####model1 all data no modifications (CPC)
+model2=lm(data=dec10.mod, as.numeric(CPC)~strategy_id+creative_name+exchange_name+os+fold_position+day_of_week+clicks+totalimpressions+totalspend+  avgcpm+CTR+avgbidprice, na.action = na.exclude)
+summary(model2)
+anova(model2)
+##adjusted R^2=.4981
+
+#####model1 all data no clicks (CTR)
+model3=lm(data=dec10.mod, CTR~strategy_id+creative_name+exchange_name+os+fold_position+day_of_week+totalimpressions+totalspend+  avgcpm+CPC+avgbidprice, na.action = na.exclude)
+summary(model3)
+anova(model3)
+##adjusted R^2=.7419
+
+#####model1 all data no clicks (CPC)
+model4=lm(data=dec10.mod, as.numeric(CPC)~strategy_id+creative_name+exchange_name+os+fold_position+day_of_week+totalimpressions+totalspend+  avgcpm+CTR+avgbidprice, na.action = na.exclude)
+summary(model4)
+anova(model4)
+##adjusted R^2=.3514
+
+dec10 <- dec10[-grep("4",dec10$fold_position),]
+
+dec10 <- dec10[!apply(dec10, 1, function(x) {dec10$fold_position == "4"}),]
