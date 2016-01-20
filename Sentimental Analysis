@@ -1,0 +1,92 @@
+library(openxlsx)
+library(tm)
+library(wordcloud)
+library(qdap)
+library(plyr)
+library(ggplot2)
+
+# Loading data
+neg <- read.xlsx('neg.xlsx', sheet = 1, colNames = FALSE)
+pos <- read.xlsx('pos.xlsx', sheet = 1, colNames = FALSE)
+raw_data <- read.xlsx('corpus.xlsx', sheet = 3)
+
+# Dataframe type to simple array
+neg <- unlist(list(neg))
+pos <- unlist(list(pos))
+
+# Actual data we need
+msg <- raw_data['message']
+
+# Data loaded as corpus to work with textMining library, Corpus is function from tm
+clean_msg <- Corpus(DataframeSource(msg))
+
+# Cleaning Data
+# Remove trailing WhiteScpace, lower case letters, erase stopwords, numbers, punctuaion
+clean_msg <- tm_map(clean_msg, stripWhitespace)
+clean_msg <- tm_map(clean_msg, tolower)
+clean_msg <- tm_map(clean_msg, removeWords, stopwords(kind = "en"))
+clean_msg <- tm_map(clean_msg, removeNumbers)
+clean_msg <- tm_map(clean_msg, removePunctuation)
+clean_msg <- tm_map(clean_msg, PlainTextDocument)
+
+# WordCloud with all words
+wordcloud(clean_msg, scale = c(5,0.5), max.words = 100, random.order = FALSE, rot.per = 0.35, use.r.layout = FALSE, colors=brewer.pal(8, "Dark2"))
+
+# Cleaned corpus to DataFrame
+df <- data.frame(text=unlist(sapply(clean_msg, `[`, "content")), stringsAsFactors=FALSE)
+
+# Sentence to bag of words and remove blanks/NA
+df_list <- sapply(df, function(x) strsplit(x, " "))
+df_unlist <- unlist(df_list[,1])
+df_unlist<- df_unlist[df_unlist != ""]
+df_unlist<- df_unlist[!is.na(df_unlist)]
+
+# Word count of all words in Cleaned Corpus
+df_word_count <- count(df_unlist)
+
+# List of pos and words in corpus (df_unlist)
+pos_words <- common(df_unlist, pos)$word
+neg_words <- common(df_unlist, neg)$word
+
+full_pos_count <- data.frame()
+full_neg_count <- data.frame()
+
+# List of pos and words in corpus (df_unlist_count) with their frequecy
+full_pos_count <- do.call(rbind, lapply(pos_words, function(x) df_word_count[df_word_count == x, ]))
+full_neg_count <- do.call(rbind, lapply(neg_words, function(x) df_word_count[df_word_count == x, ]))
+
+# WordCloud for overall positive words and Negative words
+wordcloud(full_pos_count$x, freq = full_pos_count$freq, scale = c(5,0.5), max.words = 100, random.order = FALSE, rot.per = 0.35, use.r.layout = FALSE, colors=brewer.pal(8, "Dark2"))
+wordcloud(full_neg_count$x, freq = full_neg_count$freq, scale = c(5,0.5), max.words = 100, random.order = FALSE, rot.per = 0.35, use.r.layout = FALSE, colors=brewer.pal(8, "Dark2"))
+
+
+##############################################
+# Now Positive and Negative word count in each line
+
+# Find number of positive and negative words in each line
+pos_each_line <- sapply(df_list, function(x) length(common(unlist(x), pos)$word))
+neg_each_line <- sapply(df_list, function(x) length(common(unlist(x), neg)$word))
+
+# Assigning pos and neg socre to their respective sentence
+pos_neg_score <- cbind(msg, pos_each_line, neg_each_line)
+
+# Dump output to CSV
+write.table(pos_neg_score, file = "Score.csv", col.names = c('message', 'pos_score', 'neg_score'), row.names = FALSE, sep = ',')
+
+
+# Sentiment assign with higher number of pos/neg sentiment words
+pos_msg <- sum(pos_each_line > neg_each_line)
+neg_msg <- sum(pos_each_line < neg_each_line)
+neutral <- length(pos_each_line) - (pos_msg + neg_msg)
+
+# Just a dataframe of scores
+counts <- data.frame(
+  sentiment = c('pos_score', 'neg_score', 'neutral'),
+  score = c(pos_msg, neg_msg, neutral)
+)
+
+# ggolot initialization
+plot <- ggplot(counts, aes(x="", y=score, fill=sentiment)) + geom_bar(width = 1, stat = "identity")
+# Plotting a pie
+pie <- plot + coord_polar("y", start = 0) + theme_minimal()
+pie
