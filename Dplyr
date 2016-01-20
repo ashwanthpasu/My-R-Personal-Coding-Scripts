@@ -1,0 +1,30 @@
+
+library(dplyr)
+
+# Read in the dataset and save it to a dataframe called "df".  
+# I had converted it to a csv without the analysis work you had done on the right side
+df <- read.csv("data.csv", header = T, stringsAsFactors = FALSE)
+df$total_spend_cpm <- as.numeric(df$total_spend_cpm)
+
+# Delete the "No" variable, as R automatically assigns row numbers when it reads in the dataset
+df[,1] <- NULL
+
+# Reshape into new dataset with the results
+# This is done using a package called dplyr. Explanation below
+results <- df %>% 
+  group_by(creative_name, exchange_name, os, fold_position) %>% 
+  summarise(clicks = sum(click == 'yes', na.rm = TRUE), total_impressions = n(), 
+            total_spend = sum(total_spend_cpm, na.rm = TRUE), avg_cpm = mean(total_spend_cpm, na.rm=TRUE))
+
+# Line 1 takes the dataframe and assigns what will result to a new dataframe called "results"
+# The %>% operator means "take df, then do the following"
+# Line 2 groups by each unique combination of the four variables specified
+# Line 3 and 4 summarizes the number of impressions, total spend, and avg_cpm
+
+# output the file
+write.csv(results, "results.csv")
+
+# Notes: summarizing in this way does not create a row in the results unless there is an impression with 
+# that specific combination.  Therefore the roughly 3700 rows you have on your results are not listed here.
+# On the other hand, your script missed two exchange names, leaving your results 3 impressions short of the 
+# total.  They are included here.
